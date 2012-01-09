@@ -166,6 +166,8 @@ typedef unsigned int u_int;
 #include "s_apps.h"
 #include "timeouts.h"
 
+#include "dane.h"
+
 #if (defined(OPENSSL_SYS_VMS) && __VMS_VER < 70000000)
 /* FIONBIO used as a switch to enable ioctl, and that isn't in VMS < 7.0 */
 #undef FIONBIO
@@ -341,6 +343,10 @@ static void sc_usage(void)
 	BIO_printf(bio_err," -servername host  - Set TLS extension servername in ClientHello\n");
 	BIO_printf(bio_err," -tlsextdebug      - hex dump of all TLS extensions received\n");
 	BIO_printf(bio_err," -status           - request certificate status from server\n");
+#ifdef OPENSSL_DANE
+ 	BIO_printf(bio_err," -dane         - enable use of DANE\n");
+	BIO_printf(bio_err," -danecb         - enable use of DANE using callback\n");
+#endif
 	BIO_printf(bio_err," -no_ticket        - disable use of RFC4507bis session tickets\n");
 #endif
 	BIO_printf(bio_err," -legacy_renegotiation - enable use of legacy renegotiation (dangerous)\n");
@@ -400,6 +406,10 @@ int MAIN(int argc, char **argv)
 	char *CApath=NULL,*CAfile=NULL,*cipher=NULL;
 	int reconnect=0,badop=0,verify=SSL_VERIFY_NONE,bugs=0;
 	int crlf=0;
+#ifdef OPENSSL_DANE
+	int dane=0;
+	int danecb=0;
+#endif
 	int write_tty,read_tty,write_ssl,read_ssl,tty_on,ssl_pending;
 	SSL_CTX *ctx=NULL;
 	int ret=1,in_init=1,i,nbio_test=0;
@@ -567,6 +577,12 @@ int MAIN(int argc, char **argv)
 			nbio_test=1;
 		else if	(strcmp(*argv,"-state") == 0)
 			state=1;
+#ifdef OPENSSL_DANE
+		else if	(strcmp(*argv,"-dane") == 0)
+			dane=1;
+		else if	(strcmp(*argv,"-danecb") == 0)
+			danecb=1;
+#endif
 #ifndef OPENSSL_NO_PSK
                 else if (strcmp(*argv,"-psk_identity") == 0)
 			{
@@ -895,9 +911,14 @@ bad:
 		SSL_CTX_set_cipher_list(ctx,getenv("SSL_CIPHER"));
 #endif
 
-	SSL_CTX_set_verify(ctx,verify,verify_callback);
+#ifdef OPENSSL_DANE
+	if (danecb)
+		SSL_CTX_set_verify(ctx,verify,dane_verify_cb);
+	else
+		SSL_CTX_set_verify(ctx,verify,verify_callback);
 	if (!set_cert_key_stuff(ctx,cert,key))
 		goto end;
+#endif
 
 	if ((!SSL_CTX_load_verify_locations(ctx,CAfile,CApath)) ||
 		(!SSL_CTX_set_default_verify_paths(ctx)))
@@ -1211,6 +1232,14 @@ SSL_set_tlsext_status_ids(con, ids);
 			timeoutp = &timeout;
 		else
 			timeoutp = NULL;
+			
+#ifdef OPENSSL_DANE
+		if (dane) {
+			if (dane_verify(con, host, port) < 0) {
+				BIO_printf(bio_err, "DANE failed verification\n");
+			}
+		}
+#endif
 
 		if (SSL_in_init(con) && !SSL_total_renegotiations(con))
 			{
