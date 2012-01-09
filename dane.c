@@ -32,10 +32,11 @@
 #include <sys/types.h>
 #include <netdb.h>
 
-#include <openssl/dane.h>
 #include <openssl/bio.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
+
+#include "dane.h"
 
 BIO *b_err;
 int get_tlsa(struct ub_result *result, char *s_host, short s_port);
