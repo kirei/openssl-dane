@@ -3,8 +3,8 @@
 TARGETS=	s_client
 
 OPENSSL_SRC=	$(HOME)/src/ssl/openssl-1.0.0e
-OPENSSL_INC=	/usr/local/openssl/include
-OPENSSL_LIB=	/usr/local/openssl/lib
+OPENSSL_INC=	/usr/local/ssl/include
+OPENSSL_LIB=	/usr/local/ssl/lib
 
 UNBOUND_INC=	/usr/local/include
 UNBOUND_LIB=	/usr/local/lib
