@@ -31,7 +31,6 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netdb.h>
-
 #include <openssl/bio.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
@@ -42,11 +41,67 @@ BIO *b_err;
 int get_tlsa(struct ub_result *result, char *s_host, short s_port);
 int ca_constraint(const SSL *con, const X509 *tlsa_cert, int usage);
 int service_cert_constraint(const X509 *con_cert, const X509 *tlsa_cert);
+int synthesize_tlsa_domain(char *tlsa_domain, const SSL *con, char *hostname);
+
+int synthesize_tlsa_domain(char *tlsa_domain, const SSL *con, char *hostname) {
+	int peerfd;
+	peerfd = SSL_get_fd(con);
+	socklen_t len;
+	struct sockaddr_storage addr;
+	char ipstr[INET6_ADDRSTRLEN];
+	char node[NI_MAXHOST];
+	char dns_name[256];
+	char proto[4];
+	int sock_type, optlen;
+	int port;
+	int retval;
+	BIO_printf(b_err, "early\n");
+	len = sizeof addr;
+	getpeername(peerfd, (struct sockaddr*)&addr, &len);
+	// deal with both IPv4 and IPv6:
+	if (addr.ss_family == AF_INET) {
+	    struct sockaddr_in *s = (struct sockaddr_in *)&addr;
+	    port = ntohs(s->sin_port);
+	    inet_ntop(AF_INET, &s->sin_addr, ipstr, sizeof ipstr);
+		struct sockaddr_in sa;
+		sa.sin_family = AF_INET;
+		inet_pton(AF_INET, ipstr, &sa.sin_addr);
+		int res = getnameinfo((struct sockaddr*)&sa, sizeof(sa), node, sizeof(node), NULL, 0, 0);
+	} else { // AF_INET6
+		struct sockaddr_in6 *s = (struct sockaddr_in6 *)&addr;
+	    port = ntohs(s->sin6_port);
+	    inet_ntop(AF_INET6, &s->sin6_addr, ipstr, sizeof ipstr);
+	}
+	optlen = sizeof(sock_type);
+	retval = getsockopt(peerfd, SOL_SOCKET, SO_TYPE, &sock_type, &optlen);
+	if (retval == -1) {
+		BIO_printf(b_err, "synthesize_tlsa_domain failed to get socket type: %d\n", retval);
+		return -1;
+	}
+	switch (sock_type) {
+		case SOCK_STREAM:
+			sprintf(proto, "tcp");
+			break;
+		case SOCK_DGRAM:
+			sprintf(proto, "udp");
+			break;
+	}
+	
+	retval = sprintf(tlsa_domain, "_%d._%s.%s", port, proto, node);
+	if(retval < 0) {
+		printf("failure to create dns name\n");
+		return -1;
+	}
+	BIO_printf(b_err,"DANE synthesize_tlsa_domain() dns name: %s\n", tlsa_domain);
+	
+	return 0;
+}
 
 int dane_verify_cb(int ok, X509_STORE_CTX *store) {
 	struct ub_result *dns_result;
 	struct ub_ctx* ctx;
 	char dns_name[256];
+	char ipstr[INET6_ADDRSTRLEN]; // not used but...
 	X509 *cert;
 	SSL *con;
 	typedef struct {
@@ -72,37 +127,8 @@ int dane_verify_cb(int ok, X509_STORE_CTX *store) {
 	}
 	con = X509_STORE_CTX_get_ex_data(store, SSL_get_ex_data_X509_STORE_CTX_idx());
 	mydata = SSL_get_ex_data(con, mydata_index);
-	
-	int peerfd;
-	peerfd = SSL_get_fd(con);
-	socklen_t len;
-	struct sockaddr_storage addr;
-	char ipstr[INET6_ADDRSTRLEN];
-	char node[NI_MAXHOST];
-	int port;
+	synthesize_tlsa_domain(dns_name, con, NULL);
 
-	len = sizeof addr;
-	getpeername(peerfd, (struct sockaddr*)&addr, &len);
-
-	// deal with both IPv4 and IPv6:
-	if (addr.ss_family == AF_INET) {
-	    struct sockaddr_in *s = (struct sockaddr_in *)&addr;
-	    port = ntohs(s->sin_port);
-	    inet_ntop(AF_INET, &s->sin_addr, ipstr, sizeof ipstr);
-		struct sockaddr_in sa;
-		sa.sin_family = AF_INET;
-		inet_pton(AF_INET, ipstr, &sa.sin_addr);
-		int res = getnameinfo((struct sockaddr*)&sa, sizeof(sa), node, sizeof(node), NULL, 0, 0);
-	} else { // AF_INET6
-		struct sockaddr_in6 *s = (struct sockaddr_in6 *)&addr;
-	    port = ntohs(s->sin6_port);
-	    inet_ntop(AF_INET6, &s->sin6_addr, ipstr, sizeof ipstr);
-	}
-
-	BIO_printf(b_err, "Peer IP address: %s\n", ipstr);
-	BIO_printf(b_err, "Peer port      : %d\n", port);
-	BIO_printf(b_err, "Peer hostname  : %s\n", node);
-		
 	ctx = ub_ctx_create();
 	if(!ctx) {
 		printf("error: could not create unbound context\n");
@@ -119,11 +145,6 @@ int dane_verify_cb(int ok, X509_STORE_CTX *store) {
 		return -1;
 	}
 	
-	retval = sprintf(dns_name, "_%d._tcp.%s", port, node);
-	if(retval < 0) {
-		printf("failure to create dns name\n");
-		return -1;
-	}
 	BIO_printf(b_err,"DANE dane_verify_cb() dns name: %s\n", dns_name);
 	retval = ub_resolve(ctx, dns_name, 65534, 1, &dns_result);
 	if(retval != 0) {
@@ -192,36 +213,6 @@ int dane_verify(SSL *con, char *s_host, short s_port) {
 		b_err=BIO_new_fp(stderr,BIO_NOCLOSE);
 	BIO_printf(b_err, "DANE:%s:%d\n", s_host, s_port);
 	
-	int peerfd;
-	peerfd = SSL_get_fd(con);
-	socklen_t len;
-	struct sockaddr_storage addr;
-	char ipstr[INET6_ADDRSTRLEN];
-	char node[NI_MAXHOST];
-	int port;
-
-	len = sizeof addr;
-	getpeername(peerfd, (struct sockaddr*)&addr, &len);
-
-	// deal with both IPv4 and IPv6:
-	if (addr.ss_family == AF_INET) {
-	    struct sockaddr_in *s = (struct sockaddr_in *)&addr;
-	    port = ntohs(s->sin_port);
-	    inet_ntop(AF_INET, &s->sin_addr, ipstr, sizeof ipstr);
-		struct sockaddr_in sa;
-		sa.sin_family = AF_INET;
-		inet_pton(AF_INET, ipstr, &sa.sin_addr);
-		int res = getnameinfo((struct sockaddr*)&sa, sizeof(sa), node, sizeof(node), NULL, 0, 0);
-	} else { // AF_INET6
-		struct sockaddr_in6 *s = (struct sockaddr_in6 *)&addr;
-	    port = ntohs(s->sin6_port);
-	    inet_ntop(AF_INET6, &s->sin6_addr, ipstr, sizeof ipstr);
-	}
-
-	BIO_printf(b_err, "Peer IP address: %s\n", ipstr);
-	BIO_printf(b_err, "Peer port      : %d\n", port);
-	BIO_printf(b_err, "Peer hostname  : %s\n", node);
-	
 	ctx = ub_ctx_create();
 	if(!ctx) {
 		printf("error: could not create unbound context\n");
@@ -238,11 +229,7 @@ int dane_verify(SSL *con, char *s_host, short s_port) {
 		return -1;
 	}
 	
-	retval = sprintf(dns_name, "_%d._tcp.%s", s_port, s_host );
-	if(retval < 0) {
-		printf("failure to create dns name\n");
-		return -1;
-	}
+	synthesize_tlsa_domain(dns_name, con, s_host);
 	BIO_printf(b_err,"DANE:dns name: %s\n", dns_name);
 	retval = ub_resolve(ctx, dns_name, 65534, 1, &dns_result);
 	if(retval != 0) {
