@@ -179,23 +179,24 @@ int dane_verify_cb(int ok, X509_STORE_CTX *store) {
 			if (matching_type != 0)
 				continue;
 			
-			if (usage == 0 || usage == 2) {
-				int retval;
-				retval = ca_constraint(con, tlsa_cert, usage);
-				if (retval == 0)
-					BIO_printf(b_err, "DANE dane_verify_cb() Passed validation for usage %d\n", usage);
-				else
-					BIO_printf(b_err, "DANE dane_verify_cb() Failed validation for usage %d\n", usage);
-				return retval;
-			}
-			if (usage == 1) {
-				int retval;
-				retval = service_cert_constraint(cert, tlsa_cert);
-				if (retval == 0)
-					BIO_printf(b_err, "DANE dane_verify_cb() Passed validation for usage %d\n", usage);
-				else
-					BIO_printf(b_err, "DANE dane_verify_cb() Failed validation for usage %d\n", usage);
-				return retval;
+			int retval;
+			switch (usage) {
+				case 0:
+					retval = ca_constraint(con, tlsa_cert, usage);
+					if (retval == 0)
+						BIO_printf(b_err, "DANE dane_verify_cb() Passed validation for usage %d\n", usage);
+					else
+						BIO_printf(b_err, "DANE dane_verify_cb() Failed validation for usage %d\n", usage);
+					return retval;
+					break;
+				case 1:
+					retval = service_cert_constraint(cert, tlsa_cert);
+					if (retval == 0)
+						BIO_printf(b_err, "DANE dane_verify_cb() Passed validation for usage %d\n", usage);
+					else
+						BIO_printf(b_err, "DANE dane_verify_cb() Failed validation for usage %d\n", usage);
+					return retval;
+					break;		
 			}
 		}
 	}
