@@ -101,7 +101,6 @@ int dane_verify_cb(int ok, X509_STORE_CTX *store) {
 	struct ub_result *dns_result;
 	struct ub_ctx* ctx;
 	char dns_name[256];
-	char ipstr[INET6_ADDRSTRLEN]; // not used but...
 	X509 *cert;
 	SSL *con;
 	typedef struct {
@@ -118,7 +117,7 @@ int dane_verify_cb(int ok, X509_STORE_CTX *store) {
 	
 	cert = X509_STORE_CTX_get_current_cert(store);
 	err = X509_STORE_CTX_get_error(store);
-	depth = X509_STORE_CTX_get_error_depth(ctx);
+//	depth = X509_STORE_CTX_get_error_depth(ctx); // this fails, only do if err != 0?
 	
 	int ssl_idx = SSL_get_ex_data_X509_STORE_CTX_idx();
 	if (ssl_idx < 0) {
@@ -340,7 +339,7 @@ int ca_constraint(const SSL *con, const X509 *tlsa_cert, int usage) {
 /*	Left unimplemented since I don't have a CA certificate to work with.*/
 					int ext_count, j;
 					ext_count = X509_get_ext_count(tlsa_cert);
-					BIO_printf(b_err, "DANE ca_constraint() %d certificate extensions\n");
+					BIO_printf(b_err, "DANE ca_constraint() %d certificate extensions\n", ext_count);
 
 				} else {
 					return 0;
