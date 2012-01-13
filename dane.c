@@ -297,16 +297,15 @@ int dane_verify(SSL *con, char *s_host, short s_port) {
 				case 2: {
 					SSL_CTX *con_ctx = SSL_get_SSL_CTX(con);
 					X509_STORE *vfy_store;
-					STACK_OF(X509) *chain;
-					chain = sk_X509_new_null();
-					sk_X509_push(chain, tlsa_cert);
 					
 					if (!(vfy_store = X509_STORE_new())) {
 						BIO_printf(b_err, "DANE dane_verify error creating store");
 						return -1;
 					}
-					
-						
+					X509_STORE_add_cert(vfy_store, tlsa_cert);
+					SSL_CTX_set_cert_store(con_ctx, vfy_store);
+					retval = SSL_get_verify_result(con);
+					BIO_printf(b_err, "DANE usage 2 retval: %d\n", retval);	
 					break;
 				}
 			}
