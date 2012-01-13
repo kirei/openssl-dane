@@ -166,7 +166,9 @@ typedef unsigned int u_int;
 #include "s_apps.h"
 #include "timeouts.h"
 
+#ifdef OPENSSL_DANE
 #include "dane.h"
+#endif
 
 #if (defined(OPENSSL_SYS_VMS) && __VMS_VER < 70000000)
 /* FIONBIO used as a switch to enable ioctl, and that isn't in VMS < 7.0 */
