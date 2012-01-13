@@ -96,6 +96,27 @@ int synthesize_tlsa_domain(char *tlsa_domain, const SSL *con, char *hostname) {
 	return 0;
 }
 
+int dane_verify_callback(int ok, X509_STORE_CTX *store) {
+	if (b_err == NULL)
+		b_err=BIO_new_fp(stderr,BIO_NOCLOSE);
+		
+	char data[256];
+	if (! ok) {
+		X509 *cert = X509_STORE_CTX_get_current_cert(store);
+		int depth = X509_STORE_CTX_get_error_depth(store);
+		int err = X509_STORE_CTX_get_error(store);
+		
+		BIO_printf(b_err, "dane_verify_callback error with cert at depth: %d\n", depth);
+		X509_NAME_oneline(X509_get_issuer_name(cert), data, sizeof(data));
+		BIO_printf(b_err, "dane_verify_callback issuer  = %s\n", data);
+		X509_NAME_oneline(X509_get_subject_name(cert), data, sizeof(data));
+		BIO_printf(b_err, "dane_verify_callback subject = %s\n", data);
+		BIO_printf(b_err, "dane_verify_callback error %i:%s\n", err,
+			X509_verify_cert_error_string(err));
+	}
+	
+	return ok;
+}
 int dane_verify(SSL *con, char *s_host, short s_port) {
 	struct ub_result *dns_result;
 	struct ub_ctx* ctx;

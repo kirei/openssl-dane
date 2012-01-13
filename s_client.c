@@ -906,8 +906,12 @@ bad:
 	else
 		SSL_CTX_set_cipher_list(ctx,getenv("SSL_CIPHER"));
 #endif
-
+#ifdef OPENSSL_DANE
+	SSL_CTX_set_verify(ctx,verify,dane_verify_callback);
+#endif
+#ifndef OPENSSL_DANE
 	SSL_CTX_set_verify(ctx,verify,verify_callback);
+#endif
 	if (!set_cert_key_stuff(ctx,cert,key))
 		goto end;
 
