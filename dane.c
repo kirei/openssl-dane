@@ -198,6 +198,22 @@ int dane_verify_cb(int ok, X509_STORE_CTX *store) {
 					return retval;
 					break;
 				case 2: {
+						SSL_CTX *con_ctx = SSL_get_SSL_CTX(con);
+						X509_STORE *vfy_store;
+
+						if (!(vfy_store = X509_STORE_new())) {
+							BIO_printf(b_err, "DANE dane_verify error creating store");
+							return -1;
+						}
+						X509_STORE_add_cert(vfy_store, tlsa_cert);
+						SSL_CTX_set_cert_store(con_ctx, vfy_store);
+						retval = SSL_get_verify_result(con);
+						BIO_printf(b_err, "DANE usage 2 retval: %d\n", retval);	
+						return retval;
+						break;
+					}
+				/*
+				case 2: {
 					if (ok > 0)
 						return ok;
 					STACK_OF(X509) *trusted_chain;
@@ -210,6 +226,7 @@ int dane_verify_cb(int ok, X509_STORE_CTX *store) {
 					return ok;
 					break;
 				}
+				*/
 			}
 		}
 	}
@@ -306,6 +323,7 @@ int dane_verify(SSL *con, char *s_host, short s_port) {
 					SSL_CTX_set_cert_store(con_ctx, vfy_store);
 					retval = SSL_get_verify_result(con);
 					BIO_printf(b_err, "DANE usage 2 retval: %d\n", retval);	
+					return retval;
 					break;
 				}
 			}
