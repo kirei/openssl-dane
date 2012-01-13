@@ -234,45 +234,13 @@ int ca_constraint(const SSL *con, const X509 *tlsa_cert, int usage) {
 		for (i = 0; i < sk_X509_num(cert_chain); i++) {			
 			BIO_printf(b_err, "DANE ca_constraint() cert %d of %d.\n",
 				i, sk_X509_num(cert_chain));
-			/*
-			BIO_printf(b_err, "DANE CXN Certificate\n");
-			PEM_write_bio_X509(b_err, sk_X509_value(cert_chain, i));
-			BIO_printf(b_err, "DANE TLSA Certificate\n");
-			PEM_write_bio_X509(b_err, tlsa_cert);
-			*/
+				
 			if (X509_cmp(tlsa_cert, sk_X509_value(cert_chain, i)) < 0) {
 				ret_val = -1;
 				BIO_printf(b_err, "DANE ca_constraint() certificates didn't match\n");
 			} else {
 				BIO_printf(b_err, "DANE ca_constraint() certificates matches\n");
-				if (usage == 0)
-					return 0;
-				
-				/*	For this to be a trust anchor, the following characteristics applies:
-				 * 	1. Issuer name is the same as Subject name
-				 * 	2. Either or both
-				 *	a) the Key Usage field is set to keyCertSign (KU_KEY_CERT_SIGN)
-				 *	b) the basicConstraints field has the attribute cA set to True (EXFLAG_CA)
-				 */
-				X509_NAME *issuer_name, *subject_name;
-				issuer_name = X509_get_issuer_name(tlsa_cert);
-				subject_name = X509_get_subject_name(tlsa_cert);
-				
-				if (X509_name_cmp(issuer_name, subject_name) == 0) {
-					BIO_printf(b_err, "DANE issuer == subject\n");
-					
-					if (tlsa_cert->ex_flags & EXFLAG_CA) {
-						BIO_printf(b_err, "DANE ca_constraint() EXFLAG_CA set\n");
-						return 0;
-					}
-/*	Left unimplemented since I don't have a CA certificate to work with.*/
-					int ext_count, j;
-					ext_count = X509_get_ext_count(tlsa_cert);
-					BIO_printf(b_err, "DANE ca_constraint() %d certificate extensions\n", ext_count);
-
-				} else {
-					return 0;
-				}
+				return 0;
 			}
 		}
 	}
