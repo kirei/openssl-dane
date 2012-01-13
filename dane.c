@@ -55,7 +55,6 @@ int synthesize_tlsa_domain(char *tlsa_domain, const SSL *con, char *hostname) {
 	int sock_type, optlen;
 	int port;
 	int retval;
-	BIO_printf(b_err, "early\n");
 	len = sizeof addr;
 	getpeername(peerfd, (struct sockaddr*)&addr, &len);
 	// deal with both IPv4 and IPv6:
@@ -115,6 +114,7 @@ int dane_verify_cb(int ok, X509_STORE_CTX *store) {
 	if (b_err == NULL)
 		b_err=BIO_new_fp(stderr,BIO_NOCLOSE);
 	
+	BIO_printf(b_err, "dane_verify_cb() ok = %d\n", ok);
 	cert = X509_STORE_CTX_get_current_cert(store);
 	err = X509_STORE_CTX_get_error(store);
 //	depth = X509_STORE_CTX_get_error_depth(ctx); // this fails, only do if err != 0?
@@ -196,7 +196,20 @@ int dane_verify_cb(int ok, X509_STORE_CTX *store) {
 					else
 						BIO_printf(b_err, "DANE dane_verify_cb() Failed validation for usage %d\n", usage);
 					return retval;
-					break;		
+					break;
+				case 2: {
+					if (ok > 0)
+						return ok;
+					STACK_OF(X509) *trusted_chain;
+					trusted_chain = sk_X509_new_null();
+					sk_X509_push(trusted_chain, tlsa_cert);
+					X509_STORE_CTX_trusted_stack(store, trusted_chain);
+					X509_STORE_set_depth(store, 9);
+					retval = X509_verify_cert(store);
+					
+					return ok;
+					break;
+				}
 			}
 		}
 	}
@@ -264,22 +277,38 @@ int dane_verify(SSL *con, char *s_host, short s_port) {
 				continue;
 			if (matching_type != 0)
 				continue;
-			
-			if (usage == 0 || usage == 2) {
-				int retval;
-				retval = ca_constraint(con, tlsa_cert, usage);
-				return retval;
-			}
-			if (usage == 1) {
-				X509 *cert = NULL;
-				cert = SSL_get_peer_certificate(con);
-				int retval;
-				retval = service_cert_constraint(cert, tlsa_cert);
-				if (retval == 0)
-					BIO_printf(b_err, "DANE: Passed validation for usage 1\n");
-				else
-					BIO_printf(b_err, "DANE: Failed validation for usage 1\n");
-				return retval;
+
+			int retval;
+			switch (usage) {
+				case 0:
+					return ca_constraint(con, tlsa_cert, usage);
+					//break;
+				case 1: {
+					X509 *cert = NULL;
+					cert = SSL_get_peer_certificate(con);
+					retval = service_cert_constraint(cert, tlsa_cert);
+					if (retval == 0)
+						BIO_printf(b_err, "DANE: Passed validation for usage 1\n");
+					else
+						BIO_printf(b_err, "DANE: Failed validation for usage 1\n");
+					return retval;
+					break;
+				}
+				case 2: {
+					SSL_CTX *con_ctx = SSL_get_SSL_CTX(con);
+					X509_STORE *vfy_store;
+					STACK_OF(X509) *chain;
+					chain = sk_X509_new_null();
+					sk_X509_push(chain, tlsa_cert);
+					
+					if (!(vfy_store = X509_STORE_new())) {
+						BIO_printf(b_err, "DANE dane_verify error creating store");
+						return -1;
+					}
+					
+						
+					break;
+				}
 			}
 		}
 	} else
