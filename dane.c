@@ -184,9 +184,7 @@ int dane_verify(SSL *con, char *s_host, short s_port) {
 					}
 					X509_STORE_add_cert(vfy_store, tlsa_cert);
 					SSL_CTX_set_cert_store(con_ctx, vfy_store);
-					retval = SSL_get_verify_result(con);
-					BIO_printf(b_err, "DANE usage 2 retval: %d\n", retval);	
-					return retval;
+					return 0;
 					break;
 				}
 			}

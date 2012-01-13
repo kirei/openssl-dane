@@ -345,7 +345,6 @@ static void sc_usage(void)
 	BIO_printf(bio_err," -status           - request certificate status from server\n");
 #ifdef OPENSSL_DANE
  	BIO_printf(bio_err," -dane         - enable use of DANE\n");
-	BIO_printf(bio_err," -danecb         - enable use of DANE using callback\n");
 #endif
 	BIO_printf(bio_err," -no_ticket        - disable use of RFC4507bis session tickets\n");
 #endif
@@ -408,7 +407,6 @@ int MAIN(int argc, char **argv)
 	int crlf=0;
 #ifdef OPENSSL_DANE
 	int dane=0;
-	int danecb=0;
 #endif
 	int write_tty,read_tty,write_ssl,read_ssl,tty_on,ssl_pending;
 	SSL_CTX *ctx=NULL;
@@ -580,8 +578,6 @@ int MAIN(int argc, char **argv)
 #ifdef OPENSSL_DANE
 		else if	(strcmp(*argv,"-dane") == 0)
 			dane=1;
-		else if	(strcmp(*argv,"-danecb") == 0)
-			danecb=1;
 #endif
 #ifndef OPENSSL_NO_PSK
                 else if (strcmp(*argv,"-psk_identity") == 0)
@@ -911,14 +907,9 @@ bad:
 		SSL_CTX_set_cipher_list(ctx,getenv("SSL_CIPHER"));
 #endif
 
-#ifdef OPENSSL_DANE
-	if (danecb)
-		SSL_CTX_set_verify(ctx,verify,dane_verify_cb);
-	else
-		SSL_CTX_set_verify(ctx,verify,verify_callback);
+	SSL_CTX_set_verify(ctx,verify,verify_callback);
 	if (!set_cert_key_stuff(ctx,cert,key))
 		goto end;
-#endif
 
 	if ((!SSL_CTX_load_verify_locations(ctx,CAfile,CApath)) ||
 		(!SSL_CTX_set_default_verify_paths(ctx)))
