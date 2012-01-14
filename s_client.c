@@ -166,7 +166,9 @@ typedef unsigned int u_int;
 #include "s_apps.h"
 #include "timeouts.h"
 
+#ifdef OPENSSL_DANE
 #include "dane.h"
+#endif
 
 #if (defined(OPENSSL_SYS_VMS) && __VMS_VER < 70000000)
 /* FIONBIO used as a switch to enable ioctl, and that isn't in VMS < 7.0 */
@@ -908,8 +910,7 @@ bad:
 #endif
 #ifdef OPENSSL_DANE
 	SSL_CTX_set_verify(ctx,verify,dane_verify_callback);
-#endif
-#ifndef OPENSSL_DANE
+#else
 	SSL_CTX_set_verify(ctx,verify,verify_callback);
 #endif
 	if (!set_cert_key_stuff(ctx,cert,key))

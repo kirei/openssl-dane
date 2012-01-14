@@ -2,7 +2,7 @@
 
 TARGETS=	s_client
 
-OPENSSL_SRC=	$(HOME)/src/ssl/openssl-1.0.0e
+OPENSSL_SRC=	$(HOME)/src/ssl/openssl-1.0.0f
 OPENSSL_INC=	/usr/local/ssl/include
 OPENSSL_LIB=	/usr/local/ssl/lib
 
@@ -37,6 +37,9 @@ apps.o: $(OPENSSL_SRC)/apps/apps.c
 
 app_rand.o: $(OPENSSL_SRC)/apps/app_rand.c
 	$(CC) -c -I$(OPENSSL_SRC) -I$(OPENSSL_SRC)/apps $(CFLAGS) $<
+
+diff:
+	diff -u $(OPENSSL_SRC)/apps/s_client.c s_client.c
 
 clean:
 	rm -f *.o $(TARGETS)
