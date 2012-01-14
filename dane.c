@@ -142,6 +142,10 @@ int dane_verify(SSL *con, char *s_host, short s_port) {
 			ub_strerror(retval), strerror(errno));
 		return -1;
 	}
+	if( (retval=ub_ctx_add_ta_file(ctx, "keys")) != 0) {
+		printf("error adding keys: %s\n", ub_strerror(retval));
+		return 1;
+	}
 	
 	synthesize_tlsa_domain(dns_name, con, s_host);
 	BIO_printf(b_err,"DANE:dns name: %s\n", dns_name);
@@ -150,7 +154,16 @@ int dane_verify(SSL *con, char *s_host, short s_port) {
 		printf("resolve error: %s\n", ub_strerror(retval));
 		return -1;
 	}
-	
+	if (dns_result->secure)
+		BIO_printf(b_err, "DANE DNS result is secure\n");
+	else if (dns_result->bogus) {
+		BIO_printf(b_err, "DANE DNS result is bogus: %s\n", dns_result->why_bogus);
+		return -1;
+	} else {
+		BIO_printf(b_err, "DANE DNS result is insecure\n");
+		return -1;
+	}
+		
 	if(dns_result->havedata) {
 		int i;
 		for (i = 0; dns_result->data[i] != NULL; i++) {
