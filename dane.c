@@ -158,8 +158,11 @@ int dane_verify(SSL *con, char *s_host, short s_port) {
 		BIO_printf(b_err, "DANE DNS result is secure\n");
 	else if (dns_result->bogus) {
 		BIO_printf(b_err, "DANE DNS result is bogus: %s\n", dns_result->why_bogus);
+		SSL_shutdown(con);
+
 		return -1;
 	} else {
+		// should allow PKIX validation to proceed but without DANE
 		BIO_printf(b_err, "DANE DNS result is insecure\n");
 		return -1;
 	}
@@ -214,12 +217,13 @@ int dane_verify(SSL *con, char *s_host, short s_port) {
 					
 					if (!(vfy_store = X509_STORE_new())) {
 						BIO_printf(b_err, "DANE dane_verify error creating store");
-						return -1;
+						retval = -1;
+					} else {
+						X509_STORE_add_cert(vfy_store, tlsa_cert);
+						SSL_CTX_set_cert_store(con_ctx, vfy_store);
+						retval = 0;
+						break;
 					}
-					X509_STORE_add_cert(vfy_store, tlsa_cert);
-					SSL_CTX_set_cert_store(con_ctx, vfy_store);
-					return 0;
-					break;
 				}
 			}
 		}
@@ -227,7 +231,7 @@ int dane_verify(SSL *con, char *s_host, short s_port) {
 		return 0;
 
 	(void)BIO_flush(b_err);
-	return 0;
+	return retval;
 }
 
 /*
