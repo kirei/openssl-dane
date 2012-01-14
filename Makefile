@@ -9,7 +9,7 @@ OPENSSL_LIB=	/usr/local/ssl/lib
 UNBOUND_INC=	/usr/local/include
 UNBOUND_LIB=	/usr/local/lib
 
-CFLAGS=		-I$(OPENSSL_INC) -I$(UNBOUND_INC) -DOPENSSL_NO_PSK
+CFLAGS=		-I$(OPENSSL_INC) -I$(UNBOUND_INC) -DOPENSSL_NO_PSK -DOPENSSL_DANE
 LDFLAGS=	-L$(OPENSSL_LIB) -lssl -lcrypto -L$(UNBOUND_LIB) -lunbound
 
 S_CLIENT_OBJ=	s_client.o s_cb.o s_socket.o apps.o app_rand.o dane.o
