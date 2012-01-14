@@ -208,6 +208,7 @@ int dane_verify(SSL *con, char *s_host, short s_port) {
 						BIO_printf(b_err, "DANE: Passed validation for usage 1\n");
 					else
 						BIO_printf(b_err, "DANE: Failed validation for usage 1\n");
+					X509_free(cert);
 					return retval;
 					break;
 				}
@@ -226,6 +227,7 @@ int dane_verify(SSL *con, char *s_host, short s_port) {
 					}
 				}
 			}
+			X509_free(tlsa_cert);
 		}
 	} else
 		return 0;
